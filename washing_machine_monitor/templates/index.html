@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>전원 상태 모니터</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>전원 상태 모니터링</h1>
+        <div id="status-box" class="box">
+            <p id="status-text">확인 중...</p>
+            <p id="power-text"></p>
+        </div>
+        <div class="chart-container">
+            <canvas id="powerChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let powerChart;
+
+        function updateStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusBox = document.getElementById('status-box');
+                    const statusText = document.getElementById('status-text');
+                    const powerText = document.getElementById('power-text');
+
+                    statusText.textContent = data.status;
+                    powerText.textContent = `현재 전력: ${data.power}`;
+
+                    // 상태에 맞는 스타일 클래스 적용
+                    statusBox.className = 'box'; // 일단 초기화
+                    if (data.status === '켜짐') {
+                        statusBox.classList.add('on');
+                    } else if (data.status === '꺼짐') {
+                        statusBox.classList.add('off');
+                    } else { // '연결 오류' 등
+                        statusBox.classList.add('error');
+                    }
+                    updateChart(data.graph_labels, data.graph_data);
+                })
+                .catch(error => {
+                    console.error('상태 업데이트 오류:', error);
+                    document.getElementById('status-text').textContent = '오류';
+                    document.getElementById('power-text').textContent = '서버 응답 없음';
+                    document.getElementById('status-box').className = 'box error';
+                });
+        }
+
+        // (이 아래의 Chart.js 관련 스크립트는 이전과 동일합니다)
+        function updateChart(labels, data) {
+            const ctx = document.getElementById('powerChart').getContext('2d');
+            if (powerChart) {
+                powerChart.data.labels = labels;
+                powerChart.data.datasets[0].data = data;
+                powerChart.update('none');
+            } else {
+                powerChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '전력 (W)',
+                            data: data,
+                            borderColor: 'rgba(102, 187, 106, 0.8)',
+                            backgroundColor: 'rgba(102, 187, 106, 0.2)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 0,
+                            pointHitRadius: 10
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { ticks: { color: '#888' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                            y: { beginAtZero: true, ticks: { color: '#888' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+
+        setInterval(updateStatus, 3000);
+        window.onload = updateStatus;
+    </script>
+</body>
+</html>
